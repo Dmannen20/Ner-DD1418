@@ -16,11 +16,10 @@ class BinaryLogisticRegression(object):
 
     #  ------------- Hyperparameters ------------------ #
 
-    LEARNING_RATE = 0.01  # The learning rate.
+    LEARNING_RATE = 0.5  # The learning rate.
 
 
-    # !!OBS ändrat från 0,001 till 0,01!!
-    CONVERGENCE_MARGIN = 0.01  # The convergence criterion.
+    CONVERGENCE_MARGIN = 0.001  # The convergence criterion.
 
 
     MAX_ITERATIONS = 100 # Maximal number of passes through the datapoints in stochastic gradient descent.
@@ -52,6 +51,10 @@ class BinaryLogisticRegression(object):
             self.FEATURES = len(x[0]) + 1
 
             # Encoding of the data points (as a DATAPOINTS x FEATURES size array).
+
+
+            # X kan dela in ord i fyra olika kategorier
+
             self.x = np.concatenate((np.ones((self.DATAPOINTS, 1)), np.array(x)), axis=1)
 
             # Correct labels for the datapoints.
@@ -76,22 +79,31 @@ class BinaryLogisticRegression(object):
         :param      y:    The correct labels
         """
 
+        # Implementering enligt loss formeln
+        total_loss = 0
+
+        # Loopar på alla ord (datapoints)
         for i in range(self.DATAPOINTS):
 
             z = 0
+
+            # Loopar alla features för varje enskilt ord, dotproduct
             for k in range(self.FEATURES):
                 z += self.theta[k] * x[i][k]
 
             sig_prob = self.sigmoid(z)
         
+            # Kollar labeln på ordet
             if y[i] == 1:
                 cond_prob = sig_prob
             else:
+                # Komplementet
                 cond_prob = 1 - sig_prob
             
+            # Totala lossen, adderar alla pga logaritm sannolikheter
             total_loss += math.log(cond_prob)
         
-        
+        # Delar på antal datapoints m, enligt formeln
         return -total_loss/self.DATAPOINTS
 
 
@@ -150,6 +162,7 @@ class BinaryLogisticRegression(object):
                 # Multiplicerar featurvärdet med med felet och lägger till i summan
                 
                 for k in range(self.FEATURES):
+                   # X [1,1] dvs är [capitalized, first in sentence]
                    self.gradient[k] += self.x[i][k] * error
 
             # Sparar i gradientvektorn för varje feature
@@ -165,6 +178,24 @@ class BinaryLogisticRegression(object):
         Computes the gradient based on a minibatch
         (used for minibatch gradient descent).
         """
+        for k in range(self.FEATURES):
+            self.gradient[k] = 0
+
+        for i in minibatch:
+                # Räknar ut sannolikheten från de betingade
+                cond_prob = self.conditional_prob(1,i)
+
+                # Tar vår gissning - vårt riktiga värde för att se hur långt från facit vi är
+                error = cond_prob - self.y[i]
+                # Multiplicerar featurvärdet med med felet och lägger till i summan
+                
+                for k in range(self.FEATURES):
+                   # X [1,1] dvs är [capitalized, first in sentence]
+                   self.gradient[k] += self.x[i][k] * error
+        for k in range(self.FEATURES):
+            self.gradient[k] /= len(minibatch)
+     
+
         
         # YOUR CODE HERE
 
@@ -174,8 +205,17 @@ class BinaryLogisticRegression(object):
         Computes the gradient based on a single datapoint
         (used for stochastic gradient descent).
         """
+        
+        # Räknar ut sannolikheten från de betingade
+        cond_prob = self.conditional_prob(1,datapoint)
 
-        # YOUR CODE HERE
+        # Tar vår gissning - vårt riktiga värde för att se hur långt från facit vi är
+        error = cond_prob - self.y[datapoint]
+        # Multiplicerar featurvärdet med med felet och lägger till i summan
+                
+        for k in range(self.FEATURES):
+        # X [1,1] dvs är [capitalized, first in sentence]
+            self.gradient[k] = self.x[datapoint][k] * error
 
 
     def stochastic_fit(self):
@@ -184,8 +224,22 @@ class BinaryLogisticRegression(object):
         """
         self.init_plot(self.FEATURES)
 
-        # YOUR CODE HERE
+        gradient_square_sum = float("inf")
 
+        for _ in range(self.MAX_ITERATIONS):
+
+            i = random.randrange(self.DATAPOINTS)
+            self.compute_gradient(i)
+
+            for k in range(self.FEATURES):
+                self.theta[k] = self.theta[k] - self.LEARNING_RATE * self.gradient[k]
+
+            gradient_square_sum = 0
+            for i in range(self.FEATURES):
+
+                gradient_square_sum += self.gradient[i] ** 2
+            self.update_plot(self.loss(self.x, self.y))
+   
 
     def minibatch_fit(self):
         """
@@ -193,8 +247,25 @@ class BinaryLogisticRegression(object):
         """
         self.init_plot(self.FEATURES)
 
-        # YOUR CODE HERE
+        
+        gradient_square_sum = float("inf")
 
+        while gradient_square_sum > self.CONVERGENCE_MARGIN:
+
+            minibatch = random.sample(range(self.DATAPOINTS), self.MINIBATCH_SIZE)
+            self.compute_gradient_minibatch(minibatch)
+
+            for k in range(self.FEATURES):
+                self.theta[k] = self.theta[k] - self.LEARNING_RATE * self.gradient[k]
+
+            gradient_square_sum = 0
+            for i in range(self.FEATURES):
+
+                gradient_square_sum += self.gradient[i] ** 2
+            self.update_plot(self.loss(self.x, self.y))
+
+            print(gradient_square_sum)
+      
 
     def fit(self):
         """
@@ -215,9 +286,10 @@ class BinaryLogisticRegression(object):
             for i in range(self.FEATURES):
 
                 gradient_square_sum += self.gradient[i] ** 2
-            print(gradient_square_sum)
-        # YOUR CODE HERE
+            self.update_plot(self.loss(self.x, self.y))
 
+            print(gradient_square_sum)
+ 
 
     def classify_datapoints(self, test_data, test_labels):
         """
